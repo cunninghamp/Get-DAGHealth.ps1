@@ -32,9 +32,13 @@ the SMTP settings you configure in the script.
 
 ## Monitoring
 
-This script can be used as check via the [Check_MK_Agent](https://mathias-kettner.de/checkmk_windows.html). Check out the Monitoring settings in the [Settings.xml](/Settings.xml) file.
+This script can be used as check via the [Check_MK_Agent](https://mathias-kettner.de/checkmk_windows.html). Check out the Monitoring settings in the [Settings.xml](/Settings.xml) file and set Monitoring.Enable to 1.
 
 See [Check_MK local checks](https://mathias-kettner.de/checkmk_localchecks.html) for more information.
+
+The output of the script should look like the following:
+
+    0 Get-DAGHealth=0 OK - No alerts. Checked: 16.06.2015 12:13:54; <p>Database Availability Group <strong>NAMEDAG</strong> Health Summary:</p><p>Database Availability Group <strong>NAMEDAG</strong> Health Details:</p><p>Database Availability Group <strong>NAMEDAG</strong> Member Health:</p></strong></p>
 
 ### Via the Agent
 Save the following batch script under `C:\Program Files (x86)\check_mk\local`:
