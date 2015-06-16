@@ -1,5 +1,6 @@
 ﻿<?xml version="1.0"?>
 <Settings>
+  <Monitoring>0</Monitoring>
   <EmailSettings>
     <SMTPServer>smtp.exchangeserverpro.net</SMTPServer>
     <SMTPPort>25</SMTPPort>

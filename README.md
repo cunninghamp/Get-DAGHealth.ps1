@@ -9,6 +9,7 @@ and outputs the results to screen or HTML email.
 * -Detailed, When this parameter is used a more detailed report is shown in the output.
 * -HTMLFile, When this parameter is used the HTML report is also writte to a file.
 * -SendEmail, Sends the HTML report via email using the SMTP configuration within the Settings.xml file.
+* -Monitoring, This parameter can be used to integrate this script as check into a monitoring system like Nagios/Icinga and Check_MK.
 
 ## Examples
 ```
@@ -28,6 +29,24 @@ detailed reports be output to HTML file or email instead.
 ```
 Checks all DAGs in the organization and outputs a detailed health report via email using
 the SMTP settings you configure in the script.
+
+```
+.\Get-DAGHealth.ps1 -Monitoring
+```
+Checks all DAGs in the organization and outputs a detailed health report via email using
+the SMTP settings you configure in the script.
+
+## Monitoring
+
+This script can be used as check from the [Check_MK_Agent](https://mathias-kettner.de/checkmk_windows.html). Save the following batch script under `C:\Program Files (x86)\check_mk\local`:
+
+```dosbatch
+@echo off
+
+c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe -File "C:\Program Files (x86)\check_mk\Powershell\DAG\get-daghealth.ps1"
+```
+
+See [Check_MK local checks](https://mathias-kettner.de/checkmk_localchecks.html) for more information.
 
 ## More information:
 http://exchangeserverpro.com/get-daghealth-ps1-database-availability-group-health-check-script/

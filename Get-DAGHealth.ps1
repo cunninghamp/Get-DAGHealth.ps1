@@ -2,7 +2,7 @@
 .SYNOPSIS
 Get-DAGHealth.ps1 - Exchange Server 2010/2013 Database Availability Group Health Check Script.
 
-.DESCRIPTION 
+.DESCRIPTION
 Performs a series of health checks on the Database Availability Groups
 and outputs the results to screen or HTML email.
 
@@ -17,6 +17,9 @@ When this parameter is used the HTML report is also writte to a file.
 
 .PARAMETER SendEmail
 Sends the HTML report via email using the SMTP configuration within the script.
+
+.PARAMETER Monitoring
+This parameter can be used to integrate this script as check into a monitoring system like Nagios/Icinga and Check_MK.
 
 .EXAMPLE
 .\Get-DAGHealth.ps1
@@ -62,12 +65,15 @@ V1.02, 15/10/2014 - Updated to include fixes from Test-ExchangeServerHealth.ps1
 param(
 	[Parameter( Mandatory=$false)]
 	[switch]$SendEmail,
-	
+
 	[Parameter( Mandatory=$false)]
 	[switch]$HTMLFile,
-	
+
 	[Parameter( Mandatory=$false)]
 	[switch]$Detailed,
+
+	[Parameter( Mandatory=$false)]
+	[switch]$Monitoring,
 
 	[Parameter( Mandatory=$false)]
 	[switch]$Log
@@ -77,6 +83,8 @@ param(
 #...................................
 # Variables
 #...................................
+
+$script_name = "Get-DAGHealth"
 
 $now = Get-Date											#Used for timestamps
 $date = $now.ToShortDateString()						#Short date format for email message subject
@@ -115,6 +123,10 @@ $smtpsettings = @{
     Subject = "$($ConfigFile.Settings.EmailSettings.Subject) - $now"
     }
 
+if (!$Monitoring -and $ConfigFile.Settings.Monitoring)
+{
+    $Monitoring = $true
+}
 
 #...................................
 # Logfile Strings
@@ -165,7 +177,7 @@ $string69 = "DAG databases to check"
 Function New-DAGMemberHTMLTableCell()
 {
 	param( $lineitem )
-	
+
 	$htmltablecell = $null
 
 	switch ($($line."$lineitem"))
@@ -174,7 +186,7 @@ Function New-DAGMemberHTMLTableCell()
 		"Passed" { $htmltablecell = "<td class=""pass"">$($line."$lineitem")</td>" }
 		default { $htmltablecell = "<td class=""warn"">$($line."$lineitem")</td>" }
 	}
-	
+
 	return $htmltablecell
 }
 
@@ -194,7 +206,7 @@ Function Test-E14ReplicationHealth()
 	param ( $e14mailboxserver )
 
 	$e14replicationhealth = $null
-	
+
     #Find an E14 CAS in the same site
     $ADSite = (Get-ExchangeServer $e14mailboxserver).Site
     $e14cas = (Get-ExchangeServer | where {$_.IsClientAccessServer -and $_.AdminDisplayVersion -match "Version 14" -and $_.Site -eq $ADSite} | select -first 1).FQDN
@@ -256,7 +268,9 @@ if ($Log) {
 	Write-Logfile $logstring0
 }
 
-Write-Host $initstring0
+if (!$Monitoring) {
+    Write-Host $initstring0
+}
 if ($Log) {Write-Logfile $initstring0}
 
 #Add Exchange 2010 snapin if not already loaded in the PowerShell session
@@ -318,7 +332,7 @@ catch
 	Write-Warning $string22
 	if ($Log) {Write-Logfile $string22}
 }
-    
+
 
 ### Check if any Exchange 2013 servers exist
 if (Get-ExchangeServer | Where {$_.AdminDisplayVersion -like "Version 15.*"})
@@ -365,7 +379,7 @@ if ($($dags.count) -gt 0)
 {
 	foreach ($dag in $dags)
 	{
-		
+
 		#Strings for use in the HTML report/email
 		$dagsummaryintro = "<p>Database Availability Group <strong>$($dag.Name)</strong> Health Summary:</p>"
 		$dagdetailintro = "<p>Database Availability Group <strong>$($dag.Name)</strong> Health Details:</p>"
@@ -376,16 +390,16 @@ if ($($dags.count) -gt 0)
 		$dagmemberReport = @()		#DAG member server health report
 		$dagdatabaseSummary = @()	#Database health summary report
 		$dagdatabases = @()			#Array of databases in the DAG
-		
+
 		$tmpstring = "---- Processing DAG $($dag.Name)"
 		Write-Verbose $tmpstring
 		if ($Log) {Write-Logfile $tmpstring}
-		
+
 		$dagmembers = @($dag | Select-Object -ExpandProperty Servers | Sort-Object Name)
 		$tmpstring = "$($dagmembers.count) DAG members found"
 		Write-Verbose $tmpstring
 		if ($Log) {Write-Logfile $tmpstring}
-		
+
 		#Get all databases in the DAG
         if ($HasE15)
         {
@@ -403,7 +417,7 @@ if ($($dags.count) -gt 0)
 				$dagdatabases += $tmpdatabase
 			}
 		}
-				
+
 		$tmpstring = "$($dagdatabases.count) DAG databases will be checked"
 		Write-Verbose $tmpstring
 		if ($Log) {Write-Logfile $tmpstring}
@@ -415,7 +429,7 @@ if ($($dags.count) -gt 0)
 				Write-Logfile "- $database"
 			}
 		}
-		
+
 		foreach ($database in $dagdatabases)
 		{
 			$tmpstring = "---- Processing database $database"
@@ -442,7 +456,7 @@ if ($($dags.count) -gt 0)
 			$tmpstring = "$database has $($dbcopystatus.Count) copies"
 			Write-Verbose $tmpstring
 			if ($Log) {Write-Logfile $tmpstring}
-			
+
 			foreach ($dbcopy in $dbcopystatus)
 			{
 				#Custom object for DB copy
@@ -459,16 +473,16 @@ if ($($dags.count) -gt 0)
 					"Content Index" = $null
 					}
 				$dbcopyObj = New-Object PSObject -Property $objectHash
-				
+
 				$tmpstring = "Database Copy: $($dbcopy.Identity)"
 				Write-Verbose $tmpstring
 				if ($Log) {Write-Logfile $tmpstring}
-				
+
 				$mailboxserver = $dbcopy.MailboxServer
 				$tmpstring = "Server: $mailboxserver"
 				Write-Verbose $tmpstring
 				if ($Log) {Write-Logfile $tmpstring}
-                
+
                 if ($database.AdminDisplayVersion -like "Version 14.*")
                 {
 				    $pref = ($database | Select-Object -ExpandProperty ActivationPreference | Where-Object {$_.Key -eq $mailboxserver}).Value
@@ -486,17 +500,17 @@ if ($($dags.count) -gt 0)
 				$tmpstring = "Status: $copystatus"
 				Write-Verbose $tmpstring
 				if ($Log) {Write-Logfile $tmpstring}
-				
+
 				[int]$copyqueuelength = $dbcopy.CopyQueueLength
 				$tmpstring = "Copy Queue: $copyqueuelength"
 				Write-Verbose $tmpstring
 				if ($Log) {Write-Logfile $tmpstring}
-				
+
 				[int]$replayqueuelength = $dbcopy.ReplayQueueLength
 				$tmpstring = "Replay Queue: $replayqueuelength"
 				Write-Verbose $tmpstring
 				if ($Log) {Write-Logfile $tmpstring}
-				
+
 				if ($($dbcopy.ContentIndexErrorMessage -match "is disabled in Active Directory"))
                 {
                     $contentindexstate = "Disabled"
@@ -507,7 +521,7 @@ if ($($dags.count) -gt 0)
                 }
 				$tmpstring = "Content Index: $contentindexstate"
 				Write-Verbose $tmpstring
-				if ($Log) {Write-Logfile $tmpstring}				
+				if ($Log) {Write-Logfile $tmpstring}
 
 				#Checking whether this is a replay lagged copy
 				$replaylagcopies = @($database | Select -ExpandProperty ReplayLagTimes | Where-Object {$_.Value -gt 0})
@@ -531,8 +545,8 @@ if ($($dags.count) -gt 0)
 				}
 	            $tmpstring = "Replay lag is $replaylag"
 				Write-Verbose $tmpstring
-				if ($Log) {Write-Logfile $tmpstring}				
-						
+				if ($Log) {Write-Logfile $tmpstring}
+
 				#Checking for truncation lagged copies
 				$truncationlagcopies = @($database | Select -ExpandProperty TruncationLagTimes | Where-Object {$_.Value -gt 0})
 				if ($($truncationlagcopies.count) -gt 0)
@@ -544,7 +558,7 @@ if ($($dags.count) -gt 0)
 					    {
 						    $tmpstring = "$database is truncate lagged on $mailboxserver"
 							Write-Verbose $tmpstring
-							if ($Log) {Write-Logfile $tmpstring}							
+							if ($Log) {Write-Logfile $tmpstring}
 							[bool]$truncatelag = $true
 					    }
 				    }
@@ -556,7 +570,7 @@ if ($($dags.count) -gt 0)
 	            $tmpstring = "Truncation lag is $truncatelag"
 				Write-Verbose $tmpstring
 				if ($Log) {Write-Logfile $tmpstring}
-				
+
 				$dbcopyObj | Add-Member NoteProperty -Name "Mailbox Server" -Value $mailboxserver -Force
 				$dbcopyObj | Add-Member NoteProperty -Name "Activation Preference" -Value $pref -Force
 				$dbcopyObj | Add-Member NoteProperty -Name "Status" -Value $copystatus -Force
@@ -565,27 +579,27 @@ if ($($dags.count) -gt 0)
 				$dbcopyObj | Add-Member NoteProperty -Name "Replay Lagged" -Value $replaylag -Force
 				$dbcopyObj | Add-Member NoteProperty -Name "Truncation Lagged" -Value $truncatelag -Force
 				$dbcopyObj | Add-Member NoteProperty -Name "Content Index" -Value $contentindexstate -Force
-				
+
 				$dagdbcopyReport += $dbcopyObj
 			}
-		
+
 			$copies = @($dagdbcopyReport | Where-Object { ($_."Database Name" -eq $database) })
-		
+
 			$mountedOn = ($copies | Where-Object { ($_.Status -eq "Mounted") })."Mailbox Server"
 			if ($mountedOn)
 			{
 				$databaseObj | Add-Member NoteProperty -Name "Mounted on" -Value $mountedOn -Force
 			}
-		
+
 			$activationPref = ($copies | Where-Object { ($_.Status -eq "Mounted") })."Activation Preference"
 			$databaseObj | Add-Member NoteProperty -Name "Preference" -Value $activationPref -Force
 
 			$totalcopies = $copies.count
 			$databaseObj | Add-Member NoteProperty -Name "Total Copies" -Value $totalcopies -Force
-		
+
 			$healthycopies = @($copies | Where-Object { (($_.Status -eq "Mounted") -or ($_.Status -eq "Healthy")) }).Count
 			$databaseObj | Add-Member NoteProperty -Name "Healthy Copies" -Value $healthycopies -Force
-			
+
 			$unhealthycopies = @($copies | Where-Object { (($_.Status -ne "Mounted") -and ($_.Status -ne "Healthy")) }).Count
 			$databaseObj | Add-Member NoteProperty -Name "Unhealthy Copies" -Value $unhealthycopies -Force
 
@@ -600,14 +614,14 @@ if ($($dags.count) -gt 0)
 
 			$healthyindexes = @($copies | Where-Object { ($_."Content Index" -eq "Healthy" -or $_."Content Index" -eq "Disabled") }).Count
 			$databaseObj | Add-Member NoteProperty -Name "Healthy Indexes" -Value $healthyindexes -Force
-			
+
 			$unhealthyindexes = @($copies | Where-Object { ($_."Content Index" -ne "Healthy" -and $_."Content Index" -ne "Disabled") }).Count
 			$databaseObj | Add-Member NoteProperty -Name "Unhealthy Indexes" -Value $unhealthyindexes -Force
-			
+
 			$dagdatabaseSummary += $databaseObj
-		
+
 		}
-		
+
 		#Get Test-Replication Health results for each DAG member
 		foreach ($dagmember in $dagmembers)
 		{
@@ -635,21 +649,21 @@ if ($($dags.count) -gt 0)
 
 			$memberObj = New-Object PSObject -Property $replicationhealthitems
 			$memberObj | Add-Member NoteProperty -Name "Server" -Value $dagmember
-		
+
 			$tmpstring = "---- Checking replication health for $dagmember"
 			Write-Verbose $tmpstring
 			if ($Log) {Write-Logfile $tmpstring}
-			
+
 			try
             {
-                $replicationhealth = $dagmember | Invoke-Command {Test-ReplicationHealth -ErrorAction STOP} 
+                $replicationhealth = $dagmember | Invoke-Command {Test-ReplicationHealth -ErrorAction STOP}
             }
             catch
             {
 		        if ($Log) {Write-Logfile "Using E14 replication health test workaround"}
                 $replicationhealth = Test-E14ReplicationHealth $dagmember
             }
-			
+
 	        foreach ($healthitem in $replicationhealth)
 	        {
                 if ($($healthitem.Result) -eq $null)
@@ -668,11 +682,11 @@ if ($($dags.count) -gt 0)
 			$dagmemberReport += $memberObj
 		}
 
-		
+
 		#Generate the HTML from the DAG health checks
 		if ($SendEmail -or $HTMLFile)
 		{
-		
+
 			####Begin Summary Table HTML
 			$dagdatabaseSummaryHtml = $null
 			#Begin Summary table HTML header
@@ -694,13 +708,13 @@ if ($($dags.count) -gt 0)
 
 			$dagdatabaseSummaryHtml += $htmltableheader
 			#End Summary table HTML header
-			
+
 			#Begin Summary table HTML rows
 			foreach ($line in $dagdatabaseSummary)
 			{
 				$htmltablerow = "<tr>"
 				$htmltablerow += "<td><strong>$($line.Database)</strong></td>"
-				
+
 				#Warn if mounted server is still unknown
 				switch ($($line."Mounted on"))
 				{
@@ -710,7 +724,7 @@ if ($($dags.count) -gt 0)
 						}
 					default { $htmltablerow += "<td>$($line."Mounted on")</td>" }
 				}
-				
+
 				#Warn if DB is mounted on a server that is not Activation Preference 1
 				if ($($line.Preference) -gt 1)
 				{
@@ -721,13 +735,13 @@ if ($($dags.count) -gt 0)
 				{
 					$htmltablerow += "<td class=""pass"">$($line.Preference)</td>"
 				}
-				
+
 				$htmltablerow += "<td>$($line."Total Copies")</td>"
-				
+
 				#Show as info if health copies is 1 but total copies also 1,
 	            #Warn if healthy copies is 1, Fail if 0
 				switch ($($line."Healthy Copies"))
-				{	
+				{
 					0 {$htmltablerow += "<td class=""fail"">$($line."Healthy Copies")</td>"}
 					1 {
 						if ($($line."Total Copies") -eq $($line."Healthy Copies"))
@@ -771,7 +785,7 @@ if ($($dags.count) -gt 0)
 						default { $htmltablerow += "<td class=""warn"">$($line."Healthy Queues")</td>" }
 					}
 				}
-				
+
 				#Fail if unhealthy queues = total queues
 				#Warn if more than one unhealthy queue
 				if ($($line."Total Queues") -eq $($line."Unhealthy Queues"))
@@ -786,14 +800,14 @@ if ($($dags.count) -gt 0)
 						default { $htmltablerow += "<td class=""warn"">$($line."Unhealthy Queues")</td>" }
 					}
 				}
-				
+
 				#Info for lagged queues
 				switch ($($line."Lagged Queues"))
 				{
 					0 { $htmltablerow += "<td>$($line."Lagged Queues")</td>" }
 					default { $htmltablerow += "<td class=""info"">$($line."Lagged Queues")</td>" }
 				}
-				
+
 				#Pass if healthy indexes = total copies
 				#Warn if healthy indexes less than total copies
 				#Fail if healthy indexes = 0
@@ -810,7 +824,7 @@ if ($($dags.count) -gt 0)
 						default { $htmltablerow += "<td class=""warn"">$($line."Healthy Indexes")</td>" }
 					}
 				}
-				
+
 				#Fail if unhealthy indexes = total copies
 				#Warn if unhealthy indexes 1 or more
 				#Pass if unhealthy indexes = 0
@@ -826,7 +840,7 @@ if ($($dags.count) -gt 0)
 						default { $htmltablerow += "<td class=""warn"">$($line."Unhealthy Indexes")</td>" }
 					}
 				}
-				
+
 				$htmltablerow += "</tr>"
 				$dagdatabaseSummaryHtml += $htmltablerow
 			}
@@ -855,7 +869,7 @@ if ($($dags.count) -gt 0)
 
 			$databasedetailsHtml += $htmltableheader
 			#End Detail table HTML header
-			
+
 			#Begin Detail table HTML rows
 			foreach ($line in $dagdbcopyReport)
 			{
@@ -864,7 +878,7 @@ if ($($dags.count) -gt 0)
 				$htmltablerow += "<td>$($line."Database Name")</td>"
 				$htmltablerow += "<td>$($line."Mailbox Server")</td>"
 				$htmltablerow += "<td>$($line."Activation Preference")</td>"
-				
+
 				Switch ($($line."Status"))
 				{
 					"Healthy" { $htmltablerow += "<td class=""pass"">$($line."Status")</td>" }
@@ -875,7 +889,7 @@ if ($($dags.count) -gt 0)
 					"Dismounted" { $htmltablerow += "<td class=""fail"">$($line."Status")</td>" }
 					default { $htmltablerow += "<td class=""warn"">$($line."Status")</td>" }
 				}
-				
+
 				if ($($line."Copy Queue") -lt $replqueuewarning)
 				{
 					$htmltablerow += "<td class=""pass"">$($line."Copy Queue")</td>"
@@ -884,7 +898,7 @@ if ($($dags.count) -gt 0)
 				{
 					$htmltablerow += "<td class=""warn"">$($line."Copy Queue")</td>"
 				}
-				
+
 				if (($($line."Replay Queue") -lt $replqueuewarning) -or ($($line."Replay Lagged") -eq $true))
 				{
 					$htmltablerow += "<td class=""pass"">$($line."Replay Queue")</td>"
@@ -893,7 +907,7 @@ if ($($dags.count) -gt 0)
 				{
 					$htmltablerow += "<td class=""warn"">$($line."Replay Queue")</td>"
 				}
-				
+
 
 				Switch ($($line."Replay Lagged"))
 				{
@@ -906,14 +920,14 @@ if ($($dags.count) -gt 0)
 					$true { $htmltablerow += "<td class=""info"">$($line."Truncation Lagged")</td>" }
 					default { $htmltablerow += "<td>$($line."Truncation Lagged")</td>" }
 				}
-				
+
 				Switch ($($line."Content Index"))
 				{
 					"Healthy" { $htmltablerow += "<td class=""pass"">$($line."Content Index")</td>" }
                     "Disabled" { $htmltablerow += "<td class=""info"">$($line."Content Index")</td>" }
 					default { $htmltablerow += "<td class=""warn"">$($line."Content Index")</td>" }
 				}
-				
+
 				$htmltablerow += "</tr>"
 				$databasedetailsHtml += $htmltablerow
 			}
@@ -921,8 +935,8 @@ if ($($dags.count) -gt 0)
 									</p>"
 			#End Detail table HTML rows
 			####End Detail Table HTML
-			
-			
+
+
 			####Begin Member Table HTML
 			$dagmemberHtml = $null
 			#Begin Member table HTML header
@@ -949,10 +963,10 @@ if ($($dags.count) -gt 0)
 								<th>DB Log Copy Keeping Up</th>
 								<th>DB Log Replay Keeping Up</th>
 								</tr>"
-			
+
 			$dagmemberHtml += $htmltableheader
 			#End Member table HTML header
-			
+
 			#Begin Member table HTML rows
 			foreach ($line in $dagmemberReport)
 			{
@@ -982,27 +996,28 @@ if ($($dags.count) -gt 0)
 			$dagmemberHtml += "</table>
 			</p>"
 		}
-		
+
 		#Output the report objects to console, and optionally to email and HTML file
 		#Forcing table format for console output due to issue with multiple output
 		#objects that have different layouts
 
 		#Write-Host "---- Database Copy Health Summary ----"
 		#$dagdatabaseSummary | ft
-				
+
 		#Write-Host "---- Database Copy Health Details ----"
 		#$dagdbcopyReport | ft
-		
+
 		#Write-Host "`r`n---- Server Test-Replication Report ----`r`n"
 		#$dagmemberReport | ft
-		
-		if ($SendEmail -or $HTMLFile)
+
+		if ($SendEmail -or $HTMLFile -or $Monitoring)
 		{
 			$dagreporthtml = $dagsummaryintro + $dagdatabaseSummaryHtml + $dagdetailintro + $databasedetailsHtml + $dagmemberintro + $dagmemberHtml
 			$dagreportbody += $dagreporthtml
 		}
-		
+
 	}
+    $dagavailable = $true
 }
 else
 {
@@ -1010,11 +1025,41 @@ else
 	if ($Log) {Write-LogFile $tmpstring}
 	Write-Verbose $tmpstring
 	$dagreporthtml = "<p>No database availability groups found.</p>"
+    $dagavailable = $false
 }
 ### End DAG Health Report
 
-Write-Host $string16
+if (!$Monitoring) {
+    Write-Host $string16
+}
 ### Begin report generation
+
+#Check if the DAG summary has 1 or more entries
+if ($($dagsummary.count) -gt 0)
+{
+    #Set alert flag to true
+    $alerts = $true
+
+    #Generate the HTML
+    $dagsummaryhtml = "<h3>Database Availability Group Health Check Summary</h3>
+                    <p>The following DAG errors and warnings were detected.</p>
+                    <p>
+                    <ul>"
+    foreach ($reportline in $dagsummary)
+    {
+        $dagsummaryhtml +="<li>$reportline</li>"
+    }
+    $dagsummaryhtml += "</ul></p>"
+    $alerts = $true
+    # FIXME(ypid), flag has already been set.
+}
+else
+{
+    #Generate the HTML to show no alerts
+    $dagsummaryhtml = "<h3>Database Availability Group Health Check Summary</h3>
+                    <p>No Exchange DAG errors or warnings.</p>"
+}
+
 if ($HTMLFile -or $SendEmail)
 {
 	#Get report generation timestamp
@@ -1040,37 +1085,11 @@ if ($HTMLFile -or $SendEmail)
 				<h1 align=""center"">Exchange Server Health Check Report</h1>
 				<h3 align=""center"">Generated: $reportime</h3>"
 
-	#Check if the DAG summary has 1 or more entries
-	if ($($dagsummary.count) -gt 0)
-	{
-		#Set alert flag to true
-		$alerts = $true
-	
-		#Generate the HTML
-		$dagsummaryhtml = "<h3>Database Availability Group Health Check Summary</h3>
-						<p>The following DAG errors and warnings were detected.</p>
-						<p>
-						<ul>"
-		foreach ($reportline in $dagsummary)
-		{
-			$dagsummaryhtml +="<li>$reportline</li>"
-		}
-		$dagsummaryhtml += "</ul></p>"
-		$alerts = $true
-	}
-	else
-	{
-		#Generate the HTML to show no alerts
-		$dagsummaryhtml = "<h3>Database Availability Group Health Check Summary</h3>
-						<p>No Exchange DAG errors or warnings.</p>"
-	}
-
-
 	$htmltail = "</body>
 				</html>"
 
-	$htmlreport = $htmlhead +  $dagsummaryhtml + $dagreportbody + $htmltail
-	
+	$htmlreport = $htmlhead + $dagsummaryhtml + $dagreportbody + $htmltail
+
 	if ($HTMLFile)
 	{
         Write-Verbose "Writing HTML report file"
@@ -1093,10 +1112,36 @@ if ($HTMLFile -or $SendEmail)
 		}
 	}
 }
+
+if ($Monitoring)
+{
+    $status_code = 3
+    $alerts_number = 0
+    if (!$alerts -and $dagavailable)
+    {
+        $status = "OK - No alerts."
+        $status_code = 0
+    }
+    elseif (!$dagavailable)
+    {
+        $status = "WARN - Alerts!"
+        $status_code = 1
+        $alerts_number = 1
+    }
+    elseif ($alerts)
+    {
+        $status = "CRIT - Alerts!"
+        $status_code = 2
+    }
+    $status += " " + $dagreporthtml
+    $output_line = "$status_code $script_name=$alerts_number $status"
+    write-host $output_line
+}
 ### End report generation
 
-
-Write-Host $string15
+if (!$Monitoring) {
+    Write-Host $string15
+}
 
 
 #...................................
