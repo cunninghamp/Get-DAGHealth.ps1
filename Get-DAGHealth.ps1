@@ -123,7 +123,7 @@ $smtpsettings = @{
     Subject = "$($ConfigFile.Settings.EmailSettings.Subject) - $now"
     }
 
-if (!$Monitoring -and $ConfigFile.Settings.Monitoring)
+if (!$Monitoring -and $ConfigFile.Settings.Monitoring.Enable)
 {
     $Monitoring = $true
 }
@@ -1124,7 +1124,7 @@ if ($Monitoring)
     }
     elseif (!$dagavailable)
     {
-        $status = "WARN - Alerts!"
+        $status = "WARN - DAGs could not be checked!"
         $status_code = 1
         $alerts_number = 1
     }
@@ -1133,9 +1133,12 @@ if ($Monitoring)
         $status = "CRIT - Alerts!"
         $status_code = 2
     }
-    $status += " " + $dagreporthtml
-    $output_line = "$status_code $script_name=$alerts_number $status"
+    $status +=  " Checked: " + (get-date).tostring() + "; " + $dagreporthtml
+    $output_line = "$status_code $script_name alerts=$alerts_number $status"
     write-host $output_line
+    if ($ConfigFile.Settings.Monitoring.StatusFile) {
+        $output_line > $ConfigFile.Settings.Monitoring.StatusFile
+    }
 }
 ### End report generation
 

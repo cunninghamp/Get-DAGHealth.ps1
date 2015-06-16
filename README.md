@@ -30,23 +30,38 @@ detailed reports be output to HTML file or email instead.
 Checks all DAGs in the organization and outputs a detailed health report via email using
 the SMTP settings you configure in the script.
 
-```
-.\Get-DAGHealth.ps1 -Monitoring
-```
-Checks all DAGs in the organization and outputs a detailed health report via email using
-the SMTP settings you configure in the script.
-
 ## Monitoring
 
-This script can be used as check from the [Check_MK_Agent](https://mathias-kettner.de/checkmk_windows.html). Save the following batch script under `C:\Program Files (x86)\check_mk\local`:
+This script can be used as check via the [Check_MK_Agent](https://mathias-kettner.de/checkmk_windows.html). Check out the Monitoring settings in the [Settings.xml](/Settings.xml) file.
+
+See [Check_MK local checks](https://mathias-kettner.de/checkmk_localchecks.html) for more information.
+
+### Via the Agent
+Save the following batch script under `C:\Program Files (x86)\check_mk\local`:
 
 ```dosbatch
 @echo off
 
+rem C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -noexit -command ". 'C:\Program Files\Microsoft\Exchange Server\V15\bin\RemoteExchange.ps1'; Connect-ExchangeServer -auto -ClientApplication:ManagementShell; . 'C:\Program Files (x86)\check_mk\more\DAG_production\get-daghealth.ps1'"
+
 c:\windows\system32\WindowsPowerShell\v1.0\powershell.exe -File "C:\Program Files (x86)\check_mk\Powershell\DAG\get-daghealth.ps1"
 ```
 
-See [Check_MK local checks](https://mathias-kettner.de/checkmk_localchecks.html) for more information.
+Unfortunately, I could not get this to work. "WARNING: No snap-ins have been registered for Windows PowerShell version 4."
+
+### Via task scheduler
+
+Create a task to run lets say every hour.
+
+Then save this script into the file `C:\Program Files (x86)\check_mk\local\dagmon.bat`:
+```dosbatch
+@echo off
+
+rem See Task Scheduler
+type c:\tmp\dag_state.txt
+```
+
+You might need to create or change the directory: c:\tmp
 
 ## More information:
 http://exchangeserverpro.com/get-daghealth-ps1-database-availability-group-health-check-script/
@@ -60,6 +75,13 @@ Find me on:
 * Twitter:	https://twitter.com/paulcunningham
 * LinkedIn:	http://au.linkedin.com/in/cunninghamp/
 * Github:	https://github.com/cunninghamp
+
+Support to use this script in Monitoring was added by Robin `ypid` Schneider.
+
+Find me on:
+
+* My homepage: http://ypid.de/
+* GitHub: https://github.com/ypid
 
 For more Exchange Server tips, tricks and news check out Exchange Server Pro.
 
