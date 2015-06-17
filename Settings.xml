@@ -1,5 +1,9 @@
 ﻿<?xml version="1.0"?>
 <Settings>
+  <Monitoring>
+    <Enable>0</Enable>
+    <StatusFile>c:\tmp\dag_state.txt</StatusFile>
+  </Monitoring>
   <EmailSettings>
     <SMTPServer>smtp.exchangeserverpro.net</SMTPServer>
     <SMTPPort>25</SMTPPort>
