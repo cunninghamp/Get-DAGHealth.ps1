@@ -176,7 +176,7 @@ $string69 = "DAG databases to check"
 #This function is used to generate HTML for the DAG member health report
 Function New-DAGMemberHTMLTableCell()
 {
-	param( $lineitem, [REF]$monitoring_status_array )
+	param( $lineitem )
 
 	$htmltablecell = $null
 
