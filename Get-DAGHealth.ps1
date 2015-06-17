@@ -176,17 +176,18 @@ $string69 = "DAG databases to check"
 #This function is used to generate HTML for the DAG member health report
 Function New-DAGMemberHTMLTableCell()
 {
-	param( $lineitem )
+	param( $lineitem, [REF]$monitoring_status_array )
 
 	$htmltablecell = $null
 
 	switch ($($line."$lineitem"))
 	{
 		$null { $htmltablecell = "<td>n/a</td>" }
-		"Passed" { $htmltablecell = "<td class=""pass"">$($line."$lineitem")</td>" }
+        "Passed" { $htmltablecell = "<td class=""pass"">$($line."$lineitem")</td>" }
 		default {
             $htmltablecell = "<td class=""warn"">$($line."$lineitem")</td>"
-            $monitoring_warnings += "$lineitem on $($line."Server"): $($line."$lineitem")"
+            # $global:monitoring_warnings += "$lineitem on $($line."Server"): $($line."$lineitem")"
+            # Not working?
         }
 	}
 
@@ -1036,6 +1037,16 @@ if ($($dags.count) -gt 0)
 				$htmltablerow += (New-DAGMemberHTMLTableCell "DBDisconnected")
 				$htmltablerow += (New-DAGMemberHTMLTableCell "DBLogCopyKeepingUp")
 				$htmltablerow += (New-DAGMemberHTMLTableCell "DBLogReplayKeepingUp")
+
+                if ($htmltablerow -match "[^*]fail")
+                {
+                    $monitoring_criticals += "Alert for Member Health"
+                }
+                elseif ($htmltablerow -match "warn")
+                {
+                    $monitoring_warnings += "Warning for Member Health"
+                }
+
 				$htmltablerow += "</tr>"
 				$dagmemberHtml += $htmltablerow
 			}
@@ -1170,21 +1181,21 @@ if ($Monitoring)
         $status = "WARN - DAGs could not be checked!"
         $status_code = 1
     }
-    elseif ($alerts)
+    elseif ($alerts -or $monitoring_criticals.Length)
     {
-        $status = "CRIT - Alerts!"
+        $status = "CRIT - "
         $monitoring_report = $monitoring_criticals -join ', '
         $status_code = 2
     }
-    elseif ($monitoring_criticals.Length) {
-        $monitoring_report = $monitoring_criticals -join ', '
-        $status_code = 2
-    }
-    elseif ($monitoring_warnings.Length) {
+    elseif ($monitoring_warnings.Length)
+    {
+        $status = "WARN - "
         $monitoring_report = $monitoring_warnings -join ', '
         $status_code = 1
     }
-    elseif ($monitoring_unknown.Length) {
+    elseif ($monitoring_unknown.Length)
+    {
+        $status = "UNKN -"
         $monitoring_report = $monitoring_unknown -join ', '
         $status_code = 3
     }
