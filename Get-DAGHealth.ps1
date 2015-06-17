@@ -184,7 +184,10 @@ Function New-DAGMemberHTMLTableCell()
 	{
 		$null { $htmltablecell = "<td>n/a</td>" }
 		"Passed" { $htmltablecell = "<td class=""pass"">$($line."$lineitem")</td>" }
-		default { $htmltablecell = "<td class=""warn"">$($line."$lineitem")</td>" }
+		default {
+            $htmltablecell = "<td class=""warn"">$($line."$lineitem")</td>"
+            $monitoring_warnings += "$lineitem on $($line."Server"): $($line."$lineitem")"
+        }
 	}
 
 	return $htmltablecell
@@ -374,6 +377,9 @@ if ($Log) {
 	}
 }
 
+$monitoring_unknown = @()   # Array of warnings.
+$monitoring_warnings = @()  # Array of warnings.
+$monitoring_criticals = @() # Array of critical states.
 
 if ($($dags.count) -gt 0)
 {
@@ -684,7 +690,7 @@ if ($($dags.count) -gt 0)
 
 
 		#Generate the HTML from the DAG health checks
-		if ($SendEmail -or $HTMLFile)
+		if ($SendEmail -or $HTMLFile -or $Monitoring)
 		{
 
 			####Begin Summary Table HTML
@@ -721,6 +727,7 @@ if ($($dags.count) -gt 0)
 					"Unknown" {
 						$htmltablerow += "<td class=""warn"">$($line."Mounted on")</td>"
 						$dagsummary += "$($line.Database) - $string61"
+                        # $monitoring_unknown += "$($line.Database) - $string61"
 						}
 					default { $htmltablerow += "<td>$($line."Mounted on")</td>" }
 				}
@@ -751,6 +758,7 @@ if ($($dags.count) -gt 0)
 						else
 						{
 							$htmltablerow += "<td class=""warn"">$($line."Healthy Copies")</td>"
+                            # $monitoring_warnings += "$($line.Database) - $string61"
 						}
 					  }
 					default {$htmltablerow += "<td class=""pass"">$($line."Healthy Copies")</td>"}
@@ -763,10 +771,12 @@ if ($($dags.count) -gt 0)
 					1 {
 						$htmltablerow += "<td class=""warn"">$($line."Unhealthy Copies")</td>"
 						$dagsummary += "$($line.Database) - $string63 $($line."Unhealthy Copies") $string65 $($line."Total Copies") $string66"
+                        # $monitoring_warnings += "$($line.Database) - $string63 $($line."Unhealthy Copies") $string65 $($line."Total Copies") $string66"
 						}
 					default {
 						$htmltablerow += "<td class=""fail"">$($line."Unhealthy Copies")</td>"
 						$dagsummary += "$($line.Database) - $string63 $($line."Unhealthy Copies") $string65 $($line."Total Copies") $string66"
+                        # $monitoring_criticals += "$($line.Database) - $string63 $($line."Unhealthy Copies") $string65 $($line."Total Copies") $string66"
 						}
 				}
 
@@ -781,8 +791,14 @@ if ($($dags.count) -gt 0)
 					$dagsummary += "$($line.Database) - $string64 $($line."Healthy Queues") $string65 $($line."Total Copies") $string66"
 					switch ($($line."Healthy Queues"))
 					{
-						0 {	$htmltablerow += "<td class=""fail"">$($line."Healthy Queues")</td>" }
-						default { $htmltablerow += "<td class=""warn"">$($line."Healthy Queues")</td>" }
+						0 {
+                            $htmltablerow += "<td class=""fail"">$($line."Healthy Queues")</td>"
+                            # $monitoring_criticals += "Healthy Queues: " + $($line."Healthy Queues")
+                        }
+						default {
+                            $htmltablerow += "<td class=""warn"">$($line."Healthy Queues")</td>"
+                            # $monitoring_warnings += "Healthy Queues: " + $($line."Healthy Queues")
+                        }
 					}
 				}
 
@@ -791,13 +807,17 @@ if ($($dags.count) -gt 0)
 				if ($($line."Total Queues") -eq $($line."Unhealthy Queues"))
 				{
 					$htmltablerow += "<td class=""fail"">$($line."Unhealthy Queues")</td>"
+                    # $monitoring_criticals += "Unhealthy Queues: " + $($line."Unhealthy Queues")
 				}
 				else
 				{
 					switch ($($line."Unhealthy Queues"))
 					{
 						0 { $htmltablerow += "<td class=""pass"">$($line."Unhealthy Queues")</td>" }
-						default { $htmltablerow += "<td class=""warn"">$($line."Unhealthy Queues")</td>" }
+						default {
+                            $htmltablerow += "<td class=""warn"">$($line."Unhealthy Queues")</td>"
+                            # $monitoring_warnings += "Unhealthy Queues: " + $($line."Unhealthy Queues")
+                        }
 					}
 				}
 
@@ -820,8 +840,14 @@ if ($($dags.count) -gt 0)
 					$dagsummary += "$($line.Database) - $string67 $($line."Unhealthy Indexes") $string65 $($line."Total Copies") $string66"
 					switch ($($line."Healthy Indexes"))
 					{
-						0 { $htmltablerow += "<td class=""fail"">$($line."Healthy Indexes")</td>" }
-						default { $htmltablerow += "<td class=""warn"">$($line."Healthy Indexes")</td>" }
+						0 {
+                            $htmltablerow += "<td class=""fail"">$($line."Healthy Indexes")</td>"
+                            # $monitoring_criticals += "Healthy Indexes: " + $($line."Healthy Indexes")
+                            }
+						default {
+                            $htmltablerow += "<td class=""warn"">$($line."Healthy Indexes")</td>"
+                            # $monitoring_warnings += "Healthy Indexes: " + $($line."Healthy Indexes")
+                            }
 					}
 				}
 
@@ -837,7 +863,10 @@ if ($($dags.count) -gt 0)
 					switch ($($line."Unhealthy Indexes"))
 					{
 						0 { $htmltablerow += "<td class=""pass"">$($line."Unhealthy Indexes")</td>" }
-						default { $htmltablerow += "<td class=""warn"">$($line."Unhealthy Indexes")</td>" }
+						default {
+                            $htmltablerow += "<td class=""warn"">$($line."Unhealthy Indexes")</td>"
+                            # $monitoring_warnings += "Unhealthy Indexes: " + $($line."Unhealthy Indexes")
+                        }
 					}
 				}
 
@@ -883,10 +912,22 @@ if ($($dags.count) -gt 0)
 				{
 					"Healthy" { $htmltablerow += "<td class=""pass"">$($line."Status")</td>" }
 					"Mounted" { $htmltablerow += "<td class=""pass"">$($line."Status")</td>" }
-					"Failed" { $htmltablerow += "<td class=""fail"">$($line."Status")</td>" }
-					"FailedAndSuspended" { $htmltablerow += "<td class=""fail"">$($line."Status")</td>" }
-					"ServiceDown" { $htmltablerow += "<td class=""fail"">$($line."Status")</td>" }
-					"Dismounted" { $htmltablerow += "<td class=""fail"">$($line."Status")</td>" }
+					"Failed" {
+                        $htmltablerow += "<td class=""fail"">$($line."Status")</td>"
+                        $monitoring_criticals += "Status on " + $($line."Database Copy") + ": " + $($line."Status")
+                    }
+					"FailedAndSuspended" {
+                        $htmltablerow += "<td class=""fail"">$($line."Status")</td>"
+                        $monitoring_criticals += "Status on " + $($line."Database Copy") + ": " + $($line."Status")
+                    }
+					"ServiceDown" {
+                        $htmltablerow += "<td class=""fail"">$($line."Status")</td>"
+                        $monitoring_criticals += "Status on " + $($line."Database Copy") + ": " + $($line."Status")
+                    }
+					"Dismounted" {
+                        $htmltablerow += "<td class=""fail"">$($line."Status")</td>"
+                        $monitoring_criticals += "Status on " + $($line."Database Copy") + ": " + $($line."Status")
+                    }
 					default { $htmltablerow += "<td class=""warn"">$($line."Status")</td>" }
 				}
 
@@ -897,6 +938,7 @@ if ($($dags.count) -gt 0)
 				else
 				{
 					$htmltablerow += "<td class=""warn"">$($line."Copy Queue")</td>"
+                    $monitoring_warnings += "Copy queue count on " + $($line."Database Copy") + ": " + $($line."Copy Queue")
 				}
 
 				if (($($line."Replay Queue") -lt $replqueuewarning) -or ($($line."Replay Lagged") -eq $true))
@@ -906,6 +948,7 @@ if ($($dags.count) -gt 0)
 				else
 				{
 					$htmltablerow += "<td class=""warn"">$($line."Replay Queue")</td>"
+                    $monitoring_warnings += "Replay queue count on " + $($line."Database Copy") + ": " + $($line."Replay Queue")
 				}
 
 
@@ -925,7 +968,10 @@ if ($($dags.count) -gt 0)
 				{
 					"Healthy" { $htmltablerow += "<td class=""pass"">$($line."Content Index")</td>" }
                     "Disabled" { $htmltablerow += "<td class=""info"">$($line."Content Index")</td>" }
-					default { $htmltablerow += "<td class=""warn"">$($line."Content Index")</td>" }
+					default {
+                        $htmltablerow += "<td class=""warn"">$($line."Content Index")</td>"
+                        $monitoring_warnings += "Content Index on " + $($line."Database Copy") + ": " + $($line."Content Index")
+                    }
 				}
 
 				$htmltablerow += "</tr>"
@@ -1117,23 +1163,39 @@ if ($Monitoring)
 {
     $status_code = 3
     $alerts_number = 0
-    if (!$alerts -and $dagavailable)
-    {
-        $status = "OK - No alerts."
-        $status_code = 0
-    }
-    elseif (!$dagavailable)
+    # $monitoring_report = $dagreporthtml
+
+    if (!$dagavailable)
     {
         $status = "WARN - DAGs could not be checked!"
         $status_code = 1
-        $alerts_number = 1
     }
     elseif ($alerts)
     {
         $status = "CRIT - Alerts!"
+        $monitoring_report = $monitoring_criticals -join ', '
         $status_code = 2
     }
-    $status +=  " Checked: " + (get-date).tostring() + "; " + $dagreporthtml
+    elseif ($monitoring_criticals.Length) {
+        $monitoring_report = $monitoring_criticals -join ', '
+        $status_code = 2
+    }
+    elseif ($monitoring_warnings.Length) {
+        $monitoring_report = $monitoring_warnings -join ', '
+        $status_code = 1
+    }
+    elseif ($monitoring_unknown.Length) {
+        $monitoring_report = $monitoring_unknown -join ', '
+        $status_code = 3
+    }
+    elseif (!$alerts -and $dagavailable)
+    {
+        $status = "OK - No alerts."
+        $status_code = 0
+    }
+
+    $alerts_number = $status_code
+    $status +=  " Checked: " + (get-date).tostring() + "; " + $monitoring_report
     $output_line = "$status_code $script_name alerts=$alerts_number $status"
     write-host $output_line
     if ($ConfigFile.Settings.Monitoring.StatusFile) {
